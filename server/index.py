@@ -10,6 +10,10 @@ import time
 app = Flask(__name__)
 CORS(app, resources={r"/process-frame": {"origins": "http://localhost:5173"}})
 
+@app.route('/api', methods=['GET'])
+def index():
+    return 'Hello, World!'
+
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_hands = mp.solutions.hands
