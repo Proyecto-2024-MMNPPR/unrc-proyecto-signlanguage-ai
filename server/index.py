@@ -8,7 +8,15 @@ import os
 import time
 
 app = Flask(__name__)
-CORS(app, resources={r"/process-frame": {"origins": "http://localhost:5173"}})
+CORS(app, resources={
+    r"/process-frame": {
+        "origins": [
+            "http://localhost:5173",
+            "https://signlanguage-ai.vercel.app",
+            "https://backend-signlanguage-ai.vercel.app"
+        ]
+    }
+})
 
 @app.route('/api', methods=['GET'])
 def index():
