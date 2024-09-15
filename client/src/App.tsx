@@ -3,35 +3,26 @@ import axios from 'axios';
 
 function App() {
   const videoRef = useRef<any>(null);
-  const [lastMessage, setLastMessage] = useState('');
-  const [lastMessageTime, setLastMessageTime] = useState(0);
   const [detectedMessage, setDetectedMessage] = useState('');
-  const [processedImage, setProcessedImage] = useState<any>(null);
+  const [confidence, setConfidence] = useState(0);
 
   useEffect(() => {
     if (navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
           videoRef.current.srcObject = stream;
+
+          const interval = setInterval(() => {
+            captureFrame();
+          }, 1000);
+
+          return () => clearInterval(interval);
         })
         .catch(err => {
           console.error("Error accessing the camera: ", err);
         });
     }
-
-    const interval = setInterval(captureFrame, 1000);
-    return () => clearInterval(interval);
   }, []);
-
-  const vocalize = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'es-ES';
-      window.speechSynthesis.speak(utterance);
-    } else {
-      console.error("Speech Synthesis not supported in this browser.");
-    }
-  };
 
   const captureFrame = async () => {
     const video = videoRef.current;
@@ -45,20 +36,13 @@ function App() {
 
     try {
       console.log("Sending frame to backend...");
-      const response = await axios.post('/api/process-frame', { image: imgBase64 });
+      const response = await axios.post('http://localhost:5001/api/process-frame', { image: imgBase64 });
 
       console.log(response.data);
 
-      setProcessedImage(`data:image/jpeg;base64,${response.data.processed_image}`);
-
-      const currentTime = new Date().getTime();
-      const timeDifference = currentTime - lastMessageTime;
-
-      if (response.data.message && (response.data.message !== lastMessage || timeDifference > 5000)) {
+      if (response.data.message) {
         setDetectedMessage(response.data.message);
-        setLastMessage(response.data.message);
-        setLastMessageTime(currentTime);
-        vocalize(response.data.message);
+        setConfidence(response.data.confidence);
       }
     } catch (error) {
       console.error("Error processing the frame: ", error);
@@ -68,17 +52,11 @@ function App() {
   return (
     <div className="App">
       <h1>Sign Language Detector</h1>
-      <video ref={videoRef} autoPlay></video>
-      {processedImage && (
-        <div>
-          <h2>Processed Frame:</h2>
-          <img src={processedImage} alt="Processed" />
-        </div>
-      )}
+      <video ref={videoRef} autoPlay style={{ width: '100%', height: 'auto' }}></video>
       {detectedMessage && (
         <div>
-          <h2>Detected Message:</h2>
-          <p>{detectedMessage}</p>
+          <h2>Detected Letter: {detectedMessage}</h2>
+          <p>Confidence: {confidence.toFixed(2)}%</p>
         </div>
       )}
     </div>
