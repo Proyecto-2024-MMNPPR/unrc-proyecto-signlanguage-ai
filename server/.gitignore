@@ -1,9 +1,6 @@
 # Ignore the 'data' directory
 data/
 
-# Ignore the 'data.pickle' file
-data.pickle
-
 # Ignore the 'data.txt' file
 *.egg-info/
 __pycache__/
