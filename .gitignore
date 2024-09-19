@@ -1,0 +1,10 @@
+.vscode
+.test
+.venv
+__pycache__
+tmp
+# samples
+frame_actions
+data
+videos
+.old
