@@ -5,10 +5,9 @@ import cv2
 import mediapipe as mp
 import base64
 from flask import Flask, request, jsonify
-from flask_cors import CORS
+from website import *
 
-app = Flask(__name__)
-CORS(app)
+app = create_app()
 
 model_dict = pickle.load(open('./model.p', 'rb'))
 model = model_dict['model']
@@ -58,6 +57,10 @@ def process_frame():
 
     return jsonify({'message': 'No hand detected', 'processed_image': '', 'confidence': 0})
 
+@app.route('/login', methods = ['POST'])
+def login():
+    if request.method == 'POST':
+        pass
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
