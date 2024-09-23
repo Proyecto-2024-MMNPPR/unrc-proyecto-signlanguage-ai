@@ -4,4 +4,4 @@ scikit-learn==1.5.1
 Flask==2.3.2
 Flask-Cors==3.0.10
 numpy==1.26.4
-keras-video-generators
+keras==3.5.0
