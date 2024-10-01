@@ -55,6 +55,16 @@ def evaluate_model(src=None, threshold=0.5, margin_frame=1, delay_frames=3):
 
             results = mediapipe_detection(frame, holistic_model)
             
+            # Imprimir los landmarks de la mano izquierda
+            if results.left_hand_landmarks:
+                for i, landmark in enumerate(results.left_hand_landmarks.landmark):
+                    print(f'Left Hand Landmark {i}: x={landmark.x}, y={landmark.y}, z={landmark.z}')
+            
+            # Imprimir los landmarks de la mano derecha
+            if results.right_hand_landmarks:
+                for i, landmark in enumerate(results.right_hand_landmarks.landmark):
+                    print(f'Right Hand Landmark {i}: x={landmark.x}, y={landmark.y}, z={landmark.z}')
+
             # TODO: colocar un máximo de frames para cada seña,
             # es decir, que traduzca incluso cuando hay mano si se llega a ese máximo.
             if there_hand(results) or recording:
