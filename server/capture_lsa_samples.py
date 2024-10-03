@@ -10,7 +10,7 @@ if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
 
 # Lista de palabras a capturar
-WORDS_TO_CAPTURE = ['hola', 'bien', 'gracias', 'si', 'no']
+WORDS_TO_CAPTURE = ['a', 'e', 'i', 'o', 'u']
 
 def capture_samples(dataset_size=100, min_cant_frames=5):
     '''
@@ -89,8 +89,16 @@ def capture_samples(dataset_size=100, min_cant_frames=5):
                 frame_scores.sort(key=lambda x: x[1], reverse=True)
                 selected_frames = [frame for frame, _ in frame_scores[:50]]
                 print(f'Guardando {len(selected_frames)} mejores imágenes en la carpeta {class_dir}')
+                
                 for idx, frame in enumerate(selected_frames):
-                    cv2.imwrite(os.path.join(class_dir, f'{word}_{idx}.jpg'), frame)
+                    # Guardar la imagen original
+                    original_path = os.path.join(class_dir, f'{word}_{idx}.jpg')
+                    cv2.imwrite(original_path, frame)
+
+                    # Crear y guardar la imagen espejo (volteada horizontalmente)
+                    mirrored_frame = cv2.flip(frame, 1)
+                    mirrored_path = os.path.join(class_dir, f'{word}_{idx}_mirror.jpg')
+                    cv2.imwrite(mirrored_path, mirrored_frame)
 
         cap.release()
         cv2.destroyAllWindows()
