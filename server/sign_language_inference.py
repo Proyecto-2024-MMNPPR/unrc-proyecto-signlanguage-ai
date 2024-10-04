@@ -2,8 +2,8 @@ import os
 import pickle
 import numpy as np
 import cv2
-from mediapipe.python.solutions.holistic import Holistic, HAND_CONNECTIONS
 from mediapipe.python.solutions.drawing_utils import draw_landmarks
+from mediapipe.python.solutions.holistic import Holistic, HAND_CONNECTIONS
 
 # Cargar el modelo entrenado y el mapeo de etiquetas
 model_data = pickle.load(open('model.p', 'rb'))
