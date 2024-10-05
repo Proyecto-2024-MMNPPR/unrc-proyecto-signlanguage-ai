@@ -5,6 +5,8 @@ import cv2
 from mediapipe.python.solutions.drawing_utils import draw_landmarks
 from mediapipe.python.solutions.holistic import Holistic, HAND_CONNECTIONS
 
+from tts import text_to_speech
+
 # Cargar el modelo entrenado y el mapeo de etiquetas
 model_data = pickle.load(open('model.p', 'rb'))
 model = model_data['model']
@@ -70,6 +72,9 @@ with Holistic(static_image_mode=False, min_detection_confidence=0.5, min_trackin
             # Hacer predicción si el número de keypoints es el esperado
             if len(keypoints) == 42:
                 prediction = predict(model, keypoints)
+
+                text_to_speech(prediction)
+                print(f"La palabra es {prediction}")
 
                 # Mostrar un cuadro de texto semitransparente en la parte inferior
                 overlay = frame.copy()
