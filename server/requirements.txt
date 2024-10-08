@@ -7,3 +7,6 @@ pygame
 pandas
 scikit-learn
 tensorflow
+keras
+torch
+timm
