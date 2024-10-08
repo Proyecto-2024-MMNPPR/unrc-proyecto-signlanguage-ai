@@ -8,7 +8,7 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
 from tensorflow.keras.utils import to_categorical
 
 # Cargar los datos
-data_dict = pickle.load(open('./data_normalized.pickle', 'rb'))
+data_dict = pickle.load(open('./new_data_normalized.pickle', 'rb'))
 data = data_dict['data']
 labels = np.asarray(data_dict['labels'])
 
