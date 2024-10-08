@@ -12,7 +12,8 @@ __pycache__/
 *.pyd
 
 # Environments folder & files
-venv/
+.venv
 env/
 *.env
 .Python
+
