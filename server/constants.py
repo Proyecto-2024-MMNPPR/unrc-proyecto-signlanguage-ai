@@ -1,12 +1,12 @@
 import os
 import cv2
 
-# SETTINGS
+# Settings
 MIN_LENGTH_FRAMES = 5
 LENGTH_KEYPOINTS = 1662
 MODEL_FRAMES = 15
 
-# PATHS
+# Paths
 ROOT_PATH = os.getcwd()
 FRAME_ACTIONS_PATH = os.path.join(ROOT_PATH, "frame_actions")
 DATA_PATH = os.path.join(ROOT_PATH, "data")
@@ -16,12 +16,7 @@ MODEL_PATH = os.path.join(MODEL_FOLDER_PATH, f"actions_{MODEL_FRAMES}.keras")
 KEYPOINTS_PATH = os.path.join(DATA_PATH, "keypoints")
 WORDS_JSON_PATH = os.path.join(MODEL_FOLDER_PATH, "words.json")
 
-# SHOW IMAGE PARAMETERS
+# Show image parameters
 FONT = cv2.FONT_HERSHEY_PLAIN
 FONT_SIZE = 1.5
 FONT_POS = (5, 30)
-
-words_text = {
-    "bien": "BIEN",
-    "buenos_dias": "BUENOS DÍAS",
-}

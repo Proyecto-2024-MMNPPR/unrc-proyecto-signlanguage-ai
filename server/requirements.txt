@@ -10,3 +10,4 @@ tensorflow
 keras
 torch
 timm
+PyQt5

@@ -1,8 +1,8 @@
 import os
 import cv2
 import numpy as np
+from PyQt5 import QtWidgets
 from mediapipe.python.solutions.holistic import Holistic
-from tkinter import Tk, simpledialog
 from helpers import create_folder, draw_keypoints, mediapipe_detection, there_hand
 from constants import FONT, FONT_POS, FONT_SIZE
 
@@ -22,31 +22,56 @@ STATIC_REPETITIONS = 1
 # Ensure data directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
 
+class WordCaptureDialog(QtWidgets.QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Word Capture")
+        self.word_to_train = None
+        self.is_dynamic = None
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QtWidgets.QVBoxLayout()
+
+        # Label and input for word
+        self.word_input = QtWidgets.QLineEdit(self)
+        layout.addWidget(QtWidgets.QLabel("Enter the word you want to capture:"))
+        layout.addWidget(self.word_input)
+
+        # Dynamic/static word option
+        self.dynamic_checkbox = QtWidgets.QCheckBox("Is this a dynamic word?", self)
+        layout.addWidget(self.dynamic_checkbox)
+
+        # Button to confirm
+        confirm_button = QtWidgets.QPushButton("Confirm", self)
+        confirm_button.clicked.connect(self.confirm)
+        layout.addWidget(confirm_button)
+
+        self.setLayout(layout)
+
+    def confirm(self):
+        word_to_train = self.word_input.text().strip()
+        if not word_to_train:
+            QtWidgets.QMessageBox.warning(self, "Input Error", "Please enter a valid word.")
+            return
+
+        # Replace spaces with underscores
+        self.word_to_train = word_to_train.replace(' ', '_').lower()
+        self.is_dynamic = self.dynamic_checkbox.isChecked()
+
+        self.accept()  # Close the dialog and return the inputs
+
 def get_input_word():
     """
-    Opens a dialog to get the word to capture and whether it's dynamic.
+    Opens a dialog for the user to input the word and if it's dynamic.
     Returns the word and whether it's dynamic.
     """
-    root = Tk()
-    root.withdraw()  # Hide main window
-
-    # Ask for the word to capture
-    word_to_train = simpledialog.askstring("Input", "Enter the word you want to capture:")
-    if not word_to_train:
-        return None, None
-
-    # Replace spaces with underscores
-    word_to_train = word_to_train.strip().replace(' ', '_').lower()
-
-    # Validate input for dynamic or static word
-    while True:
-        is_dynamic = simpledialog.askstring("Input", f"Is '{word_to_train}' a dynamic word? (y/n):").strip().lower()
-        if is_dynamic in ['y', 'n']:
-            break
-        else:
-            print("Invalid input. Please enter 'y' for yes or 'n' for no.")
-
-    return word_to_train, is_dynamic == 'y'
+    app = QtWidgets.QApplication([])
+    dialog = WordCaptureDialog()
+    
+    if dialog.exec_() == QtWidgets.QDialog.Accepted:
+        return dialog.word_to_train, dialog.is_dynamic
+    return None, None
 
 def capture_samples(word, is_dynamic=False, dataset_size=100, sequence_length=30):
     """
@@ -77,6 +102,7 @@ def capture_samples(word, is_dynamic=False, dataset_size=100, sequence_length=30
             while True:
                 ret, frame = cap.read()
                 if not ret:
+                    print("Error: Camera not accessible.")
                     break
 
                 image = frame.copy()
@@ -129,14 +155,13 @@ def capture_samples(word, is_dynamic=False, dataset_size=100, sequence_length=30
         cap.release()
         cv2.destroyAllWindows()
 
-        # Prompt asking if the user wants to continue or stop
-        response = simpledialog.askstring("Input", "Do you want to continue capturing another word? (y/n)").strip().lower()
-        while response not in ['y', 'n']:
-            print("Invalid input. Please enter 'y' for yes or 'n' for no.")
-            response = simpledialog.askstring("Input", "Do you want to continue capturing another word? (y/n)").strip().lower()
+        # Ask the user if they want to capture another word
+        app = QtWidgets.QApplication([])
+        response = QtWidgets.QMessageBox.question(None, "Continue", "Do you want to capture another word?", 
+                                                  QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
 
-        if response == 'y':
-            main()  # Call main to capture a new word
+        if response == QtWidgets.QMessageBox.Yes:
+            main()
         else:
             print("Capture process finished.")
 

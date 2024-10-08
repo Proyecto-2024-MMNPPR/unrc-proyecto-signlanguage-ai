@@ -8,7 +8,7 @@ import pandas as pd
 from typing import NamedTuple
 from constants import *
 
-# GENERAL
+# General
 def mediapipe_detection(image, model):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image.flags.writeable = False
@@ -17,8 +17,7 @@ def mediapipe_detection(image, model):
 
 def create_folder(path):
     '''
-    ### CREAR CARPETA SI NO EXISTE
-    Si ya existe, no hace nada.
+    ### Create folder
     '''
     if not os.path.exists(path):
         os.makedirs(path)
@@ -31,10 +30,10 @@ def get_word_ids(path):
         data = json.load(json_file)
         return data.get('word_ids')
 
-# CAPTURE SAMPLES
+# Capture samples
 def draw_keypoints(image, results):
     '''
-    Dibuja los keypoints en la imagen
+    Draw the keypoints on the image
     '''
     draw_landmarks(
         image,
@@ -73,7 +72,7 @@ def save_frames(frames, output_folder):
         frame_path = os.path.join(output_folder, f"{num_frame + 1}.jpg")
         cv2.imwrite(frame_path, cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA))
 
-# CREATE KEYPOINTS
+# Create keypoints
 def extract_keypoints(results):
     pose = np.array([[res.x, res.y, res.z, res.visibility] for res in results.pose_landmarks.landmark]).flatten() if results.pose_landmarks else np.zeros(33*4)
     face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten() if results.face_landmarks else np.zeros(468*3)
@@ -83,8 +82,7 @@ def extract_keypoints(results):
 
 def get_keypoints(model, sample_path):
     '''
-    ### OBTENER KEYPOINTS DE LA MUESTRA
-    Retorna la secuencia de keypoints de la muestra
+    ### Get keypoints from the sample
     '''
     kp_seq = np.array([])
     for img_name in os.listdir(sample_path):
@@ -97,8 +95,7 @@ def get_keypoints(model, sample_path):
 
 def insert_keypoints_sequence(df, n_sample:int, kp_seq):
     '''
-    ### INSERTA LOS KEYPOINTS DE LA MUESTRA AL DATAFRAME
-    Retorna el mismo DataFrame pero con los keypoints de la muestra agregados
+    ### Insert the keypoints sequence into the dataframe
     '''
     for frame, keypoints in enumerate(kp_seq):
         data = {'sample': n_sample, 'frame': frame + 1, 'keypoints': [keypoints]}
@@ -107,7 +104,7 @@ def insert_keypoints_sequence(df, n_sample:int, kp_seq):
     
     return df
 
-# TRAINING MODEL
+# Training model
 def get_sequences_and_labels(words_id):
     sequences, labels = [], []
     
