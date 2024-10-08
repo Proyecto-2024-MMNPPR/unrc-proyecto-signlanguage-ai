@@ -92,13 +92,13 @@ with Holistic(static_image_mode=False, min_detection_confidence=0.5, min_trackin
         if len(keypoints) == num_features:
             sequence.append(keypoints)
 
-                text_to_speech(prediction)
-                print(f"La palabra es {prediction}")
+            #text_to_speech(prediction)
+            #print(f"La palabra es {prediction}")  lineas comentadas por que generan errores
 
-                # Mostrar un cuadro de texto semitransparente en la parte inferior
-                overlay = frame.copy()
-                cv2.rectangle(overlay, (0, frame.shape[0] - 60), (frame.shape[1], frame.shape[0]), (0, 0, 0), -1)
-                frame = cv2.addWeighted(overlay, 0.6, frame, 0.4, 0)
+            # Mostrar un cuadro de texto semitransparente en la parte inferior
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (0, frame.shape[0] - 60), (frame.shape[1], frame.shape[0]), (0, 0, 0), -1)
+            frame = cv2.addWeighted(overlay, 0.6, frame, 0.4, 0)
         
         # Controlar el tamaño de la secuencia
         if len(sequence) > max_sequence_length:

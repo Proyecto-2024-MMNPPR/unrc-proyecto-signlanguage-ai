@@ -13,7 +13,7 @@ from torch.nn import CrossEntropyLoss
 from torch.utils.data import TensorDataset, DataLoader
 
 # Cargar los datos
-data_dict = pickle.load(open('./data_normalized.pickle', 'rb'))
+data_dict = pickle.load(open('./new_data_normalized.pickle', 'rb'))
 data = data_dict['data']
 labels = np.asarray(data_dict['labels'])
 
