@@ -24,11 +24,11 @@ def normalize_keypoints(landmarks):
     min_y, max_y = min(y_coords), max(y_coords)
     
     normalized_landmarks = [
-        (landmark.x - min_x) / (max_x - min_x) if max_x - min_x != 0 else 0,
-        (landmark.y - min_y) / (max_y - min_y) if max_y - min_y != 0 else 0
+        ((landmark.x - min_x) / (max_x - min_x) if max_x - min_x != 0 else 0,
+         (landmark.y - min_y) / (max_y - min_y) if max_y - min_y != 0 else 0)
         for landmark in landmarks
     ]
-    return normalized_landmarks
+    return [coord for pair in normalized_landmarks for coord in pair]  # Flatten the list of tuples
 
 def process_image(image_path, holistic):
     """Process a single image to extract and normalize hand keypoints."""
