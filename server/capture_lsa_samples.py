@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from PyQt5 import QtWidgets
 from mediapipe.python.solutions.holistic import Holistic
-from helpers import create_folder, draw_keypoints, mediapipe_detection, there_hand
+from helpers import create_folder, draw_keypoints, mediapipe_detection
 from constants import FONT, FONT_POS, FONT_SIZE
 
 # Constants
@@ -12,9 +12,11 @@ RECORDING_DELAY_MS = 2000
 CAPTURE_KEY_START = 's'
 CAPTURE_KEY_FINISH = 'f'
 CAPTURE_KEY_EXIT = 'q'
+CAPTURE_KEY_PAUSE = 'p'
 FRAME_SIZE = (480, 640, 3)
 FONT_COLOR_RECORDING = (0, 255, 0)
 FONT_COLOR_CAPTURING = (255, 50, 0)
+FONT_COLOR_PAUSED = (255, 255, 0)
 FONT_COLOR_INSTRUCTIONS = (0, 255, 0)
 DYNAMIC_REPETITIONS = 5
 STATIC_REPETITIONS = 1
@@ -22,56 +24,23 @@ STATIC_REPETITIONS = 1
 # Ensure data directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
 
-class WordCaptureDialog(QtWidgets.QDialog):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Word Capture")
-        self.word_to_train = None
-        self.is_dynamic = None
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QtWidgets.QVBoxLayout()
-
-        # Label and input for word
-        self.word_input = QtWidgets.QLineEdit(self)
-        layout.addWidget(QtWidgets.QLabel("Enter the word you want to capture:"))
-        layout.addWidget(self.word_input)
-
-        # Dynamic/static word option
-        self.dynamic_checkbox = QtWidgets.QCheckBox("Is this a dynamic word?", self)
-        layout.addWidget(self.dynamic_checkbox)
-
-        # Button to confirm
-        confirm_button = QtWidgets.QPushButton("Confirm", self)
-        confirm_button.clicked.connect(self.confirm)
-        layout.addWidget(confirm_button)
-
-        self.setLayout(layout)
-
-    def confirm(self):
-        word_to_train = self.word_input.text().strip()
-        if not word_to_train:
-            QtWidgets.QMessageBox.warning(self, "Input Error", "Please enter a valid word.")
-            return
-
-        # Replace spaces with underscores
-        self.word_to_train = word_to_train.replace(' ', '_').lower()
-        self.is_dynamic = self.dynamic_checkbox.isChecked()
-
-        self.accept()  # Close the dialog and return the inputs
-
 def get_input_word():
     """
-    Opens a dialog for the user to input the word and if it's dynamic.
+    Prompts the user to input the word and whether it is dynamic via the console.
     Returns the word and whether it's dynamic.
     """
-    app = QtWidgets.QApplication([])
-    dialog = WordCaptureDialog()
+    word_to_train = input("Enter the word you want to capture: ").strip().replace(' ', '_').lower()
+
+    # Ensure valid input for dynamic word question
+    while True:
+        is_dynamic = input("Is this a dynamic word? (y/n): ").lower()
+        if is_dynamic in ['y', 'n']:
+            is_dynamic = is_dynamic == 'y'
+            break
+        else:
+            print("Invalid input. Please enter 'y' for yes or 'n' for no.")
     
-    if dialog.exec_() == QtWidgets.QDialog.Accepted:
-        return dialog.word_to_train, dialog.is_dynamic
-    return None, None
+    return word_to_train, is_dynamic
 
 def capture_samples(word, is_dynamic=False, dataset_size=100, sequence_length=30):
     """
@@ -93,6 +62,7 @@ def capture_samples(word, is_dynamic=False, dataset_size=100, sequence_length=30
             print(f"Starting capture {rep + 1} of {repetitions} for '{word}'")
             frames = []
             capturing = False
+            paused = False
 
             # Display a message before starting capture
             cv2.putText(image := np.zeros(FRAME_SIZE, dtype=np.uint8), f'Recording: {word}', (100, 240), FONT, 1.5, FONT_COLOR_RECORDING, 2)
@@ -109,18 +79,35 @@ def capture_samples(word, is_dynamic=False, dataset_size=100, sequence_length=30
                 results = mediapipe_detection(frame, holistic_model)
 
                 # Display capture status on the screen
-                status_text = f'Capturing: {len(frames)}' if capturing else 'Press "s" to start, "f" to finish'
-                cv2.putText(image, status_text, FONT_POS, FONT, FONT_SIZE, FONT_COLOR_CAPTURING if capturing else FONT_COLOR_INSTRUCTIONS)
+                if paused:
+                    status_text = 'Paused. Press "p" to resume'
+                    font_color = FONT_COLOR_PAUSED
+                elif capturing:
+                    status_text = f'Capturing: {len(frames)}'
+                    font_color = FONT_COLOR_CAPTURING
+                else:
+                    status_text = 'Press "s" to start, "f" to finish, "p" to pause'
+                    font_color = FONT_COLOR_INSTRUCTIONS
+
+                cv2.putText(image, status_text, FONT_POS, FONT, FONT_SIZE, font_color)
                 draw_keypoints(image, results)
                 cv2.imshow(f'Capturing: {word}', image)
 
                 key = cv2.waitKey(10) & 0xFF
 
                 # Start capturing
-                if key == ord(CAPTURE_KEY_START) and not capturing:
+                if key == ord(CAPTURE_KEY_START) and not capturing and not paused:
                     capturing = True
                     frames = []  # Reset frames
                     print('Capture started...')
+
+                # Pause capturing
+                elif key == ord(CAPTURE_KEY_PAUSE):
+                    paused = not paused
+                    if paused:
+                        print('Capture paused...')
+                    else:
+                        print('Capture resumed...')
 
                 # Stop capturing
                 elif key == ord(CAPTURE_KEY_FINISH) and capturing:
@@ -129,8 +116,8 @@ def capture_samples(word, is_dynamic=False, dataset_size=100, sequence_length=30
                     save_samples(class_dir, frames, rep, is_dynamic, word)
                     break
 
-                # Collect frames only if a hand is detected
-                if capturing and there_hand(results):
+                # Collect frames regardless of whether a hand is detected
+                if capturing and not paused:
                     frames.append(frame)
 
                 # Stop capturing when the required number of frames is collected
@@ -156,14 +143,16 @@ def capture_samples(word, is_dynamic=False, dataset_size=100, sequence_length=30
         cv2.destroyAllWindows()
 
         # Ask the user if they want to capture another word
-        app = QtWidgets.QApplication([])
-        response = QtWidgets.QMessageBox.question(None, "Continue", "Do you want to capture another word?", 
-                                                  QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-
-        if response == QtWidgets.QMessageBox.Yes:
-            main()
-        else:
-            print("Capture process finished.")
+        while True:
+            response = input("Do you want to capture another word? (y/n): ").lower()
+            if response in ['y', 'n']:
+                if response == 'y':
+                    main()
+                else:
+                    print("Capture process finished.")
+                break
+            else:
+                print("Invalid input. Please enter 'y' for yes or 'n' for no.")
 
 def save_samples(class_dir, frames, rep, is_dynamic, word):
     """
@@ -189,7 +178,7 @@ def save_samples(class_dir, frames, rep, is_dynamic, word):
             cv2.imwrite(mirrored_path, mirrored_frame)
 
 def main():
-    # Open a dialog to ask for the word and its type
+    # Get input from the user via the console
     word_to_train, is_dynamic = get_input_word()
     if word_to_train:
         capture_samples(word_to_train, is_dynamic)
