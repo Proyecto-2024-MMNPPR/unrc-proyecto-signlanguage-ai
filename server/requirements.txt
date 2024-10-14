@@ -1,0 +1,13 @@
+opencv-python
+mediapipe
+numpy
+datetime
+gtts
+pygame
+pandas
+scikit-learn
+tensorflow
+keras
+torch
+timm
+PyQt5
