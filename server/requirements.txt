@@ -11,3 +11,5 @@ keras
 torch
 timm
 PyQt5
+Flask
+Flask-Cors
