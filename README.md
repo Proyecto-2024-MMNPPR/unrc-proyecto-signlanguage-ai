@@ -23,44 +23,33 @@ This project is developed by students and professors from the Universidad Nacion
 
 ## 🚀 How to Use
 
-### Requirements
+To run the project, you need to have Python and Node.js installed on your system. Follow the steps below to set up the project:
 
-To install the necessary dependencies, use the following command:
+In the root of the project, you will find ``setup.sh`` script, which will help you to install the required dependencies, set up, and run the project.
+
+### Install Dependencies
+To install the dependencies for the project, run the following command:
 
 ```bash
-pip install -r requirements.txt
+setup.sh dep install
 ```
 
-### Data Collection
+### AI
+To create dataset, train the model and run the AI, you need to run the following commands:
 
-You can collect images for each letter of the alphabet (currently focusing on vowels) by running the following script. This will open your camera to capture images for training the model:
-
+First, record the samples, the data needed to train the model:
 ```bash
-python collect_imgs.py
+setup.sh ai capture
 ```
 
-### Dataset Creation
-
-After collecting images, run the script to process and create a dataset for training:
-
+Then, train the model:
 ```bash
-python create_dataset.py
+setup.sh ai train
 ```
 
-### Model Training
-
-Once the dataset is prepared, you can train the classifier using:
-
+Finally, run the AI to detect the sign language:
 ```bash
-python train_classifier.py
-```
-
-### Real-Time Inference
-
-To use the trained model for real-time sign language detection, run:
-
-```bash
-python inference_classifier.py
+setup.sh ai run
 ```
 
 ## 🤝 Contributions
