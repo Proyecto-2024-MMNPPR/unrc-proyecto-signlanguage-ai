@@ -3,15 +3,39 @@ import { Holistic } from '@mediapipe/holistic';
 import { Camera } from '@mediapipe/camera_utils';
 import background from './assets/background.png';
 import unrcLogotype from './assets/unrc-logotype.png';
+import axios from 'axios';
 import './App.css';
 
 function App() {
   // States
   const [currentTime, setCurrentTime] = useState('');
+  const [keypointsSequence, setKeypointsSequence] = useState([]); // Estado para almacenar la secuencia de keypoints
+  const [prediction, setPrediction] = useState(''); // Estado para la predicción del backend
 
   // References
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const sendSequenceToBackend = async (sequence) => {
+    console.log("Sending sequence to backend...", sequence);
+    try {
+      const response = await fetch('/api/predict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sequence: sequence,
+        }),
+      })
+        .then(response => response.json())
+        .then(data => console.log('Prediction:', data))
+        .catch(error => console.error('Error:', error));
+    } catch (error) {
+      console.error('Error sending sequence:', error);
+    }
+  };
+
 
   // Secondary effects
   useEffect(() => {
@@ -56,17 +80,40 @@ function App() {
         canvasRef.current.height
       );
 
-      // Draw face landmarks
-      if (results.faceLandmarks) {
-        drawLandmarks(canvasCtx!, results.faceLandmarks, { color: 'red', lineWidth: 1 });
+      // Draw hand landmarks and collect keypoints
+      let keypoints = [];
+      let rightHandKeypoints = [];
+      let leftHandKeypoints = [];
+
+      if (results.rightHandLandmarks) {
+        // Flatten right hand landmarks (x, y coordinates)
+        rightHandKeypoints = results.rightHandLandmarks.map((point: any) => [point.x, point.y]).flat();
       }
 
-      // Draw hand landmarks
-      if (results.rightHandLandmarks) {
-        drawLandmarks(canvasCtx!, results.rightHandLandmarks, { color: 'blue', lineWidth: 2 });
-      }
       if (results.leftHandLandmarks) {
-        drawLandmarks(canvasCtx!, results.leftHandLandmarks, { color: 'blue', lineWidth: 2 });
+        // Flatten left hand landmarks (x, y coordinates)
+        leftHandKeypoints = results.leftHandLandmarks.map((point: any) => [point.x, point.y]).flat();
+      }
+
+      // Rellenar con ceros si falta una mano
+      if (rightHandKeypoints.length === 0) {
+        rightHandKeypoints = Array(42).fill(0); // Rellenar con 42 ceros
+      }
+      if (leftHandKeypoints.length === 0) {
+        leftHandKeypoints = Array(42).fill(0); // Rellenar con 42 ceros
+      }
+
+      keypoints = rightHandKeypoints.concat(leftHandKeypoints);
+
+      // Agregar keypoints a la secuencia si hay datos (84 features per frame)
+      if (keypoints.length === 84) {
+        setKeypointsSequence((prevSequence: any) => {
+          const newSequence = [...prevSequence, keypoints].slice(-30); // Mantener longitud máxima de 30 frames
+          if (newSequence.length === 30) {
+            sendSequenceToBackend(newSequence.flat()); // Enviar la secuencia cuando esté completa
+          }
+          return newSequence;
+        });
       }
 
       canvasCtx?.restore();
@@ -129,6 +176,11 @@ function App() {
             />
           </div>
         </div>
+        {prediction && (
+          <div className="mt-4 text-white text-lg">
+            Prediction: {prediction}
+          </div>
+        )}
       </div>
     </div>
   );
