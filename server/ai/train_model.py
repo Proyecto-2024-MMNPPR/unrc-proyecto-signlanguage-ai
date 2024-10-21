@@ -1,13 +1,12 @@
 import pickle
 import numpy as np
+import keras
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Input, Attention, Flatten
 from tensorflow.keras.utils import to_categorical
-import torch
-from torch.utils.data import TensorDataset, DataLoader
 from constants import *
 
 
@@ -41,6 +40,29 @@ def train_lstm(x_train, y_train, x_test, y_test, max_sequence_length, num_featur
     print('LSTM Accuracy: {:.2f}%'.format(score_lstm * 100))
     return model_lstm, score_lstm
 
+# -------- LSTM + Attention Layer  --------
+def train_att_lstm(x_train, y_train, x_test, y_test, max_sequence_length, num_features, unique_labels):
+    inputs = Input(shape=(max_sequence_length, num_features))
+    lstm_out1 = LSTM(64, return_sequences=True)(inputs)
+    lstm_out1 = Dropout(0.2)(lstm_out1)
+    lstm_out2 = LSTM(64, return_sequences=True)(lstm_out1)
+    lstm_out2 = Dropout(0.2)(lstm_out2)
+    attention = Attention()([lstm_out2, lstm_out2])
+    attention = Flatten()(attention)
+    outputs = Dense(len(unique_labels), activation='softmax')(attention)
+
+    model_att_lstm = Sequential()
+    model_att_lstm = keras.Model(inputs=inputs, outputs=outputs)
+
+    model_att_lstm.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model_att_lstm.fit(x_train, y_train, epochs=20, batch_size=16, validation_data=(x_test, y_test), verbose=1)
+
+    
+    y_predict_lstm = np.argmax(model_att_lstm.predict(x_test), axis=1)
+    score_att_lstm = accuracy_score(y_test.argmax(axis=1), y_predict_lstm)
+    print('LSTM + Attention Accuracy: {:.2f}%'.format(score_att_lstm * 100))
+    return model_att_lstm, score_att_lstm
+
 def train_model() -> None:
     # Load the normalized data
     data_dict = pickle.load(open(OUTPUT_PICKLE, 'rb'))
@@ -70,20 +92,24 @@ def train_model() -> None:
     # Entrenar y evaluar ambos modelos
     model_rf, score_rf = train_random_forest(x_train, y_train, x_test, y_test)
     model_lstm, score_lstm = train_lstm(x_train, y_train_lstm, x_test, y_test_lstm, max_sequence_length, num_features, unique_labels)
+    model_att_lstm, score_att_lstm = train_att_lstm(x_train, y_train_lstm, x_test, y_test_lstm, max_sequence_length, num_features, unique_labels)
 
     # Comparar las precisiones y guardar el mejor modelo
-    if score_rf >= score_lstm:
+    if score_rf >= score_lstm and score_rf >= score_att_lstm:
         best_model = model_rf
         model_name = 'Random Forest'
-    else:
+    elif score_lstm >= score_rf and score_lstm >= score_att_lstm:
         best_model = model_lstm
         model_name = 'LSTM'
+    else:
+        best_model = model_att_lstm
+        model_name = 'LSTM + Attention'
 
     # Save the best model
     with open('model.p', 'wb') as f:
         pickle.dump({'model': best_model, 'model_type': model_name, 'label_map': int_to_label}, f)
 
-    print('The best model is {} with an accuracy of {:.2f}%'.format(model_name, max(score_rf, score_lstm) * 100))
+    print('The best model is {} with an accuracy of {:.2f}%'.format(model_name, max(score_rf, score_lstm, score_att_lstm) * 100))
 
 
 if __name__ == '__main__':

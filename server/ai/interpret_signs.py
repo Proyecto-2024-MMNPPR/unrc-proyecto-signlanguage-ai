@@ -95,7 +95,7 @@ def predict_sequence(model_data, sequence, max_sequence_length, num_features) ->
     sequence = np.array(sequence)
 
     # Adjust input shape based on model type
-    if model_type == 'LSTM':
+    if model_type == 'LSTM' or model_type == 'LSTM + Attention':
         sequence = sequence.reshape(1, max_sequence_length, num_features)
         prediction = model.predict(sequence)
         prediction = np.argmax(prediction, axis=1)
