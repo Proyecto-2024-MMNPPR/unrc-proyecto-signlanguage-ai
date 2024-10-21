@@ -1,12 +1,19 @@
-import { useRef, useEffect } from 'react';
-import './App.css';
+import { useRef, useEffect, useState } from 'react';
 import { Holistic } from '@mediapipe/holistic';
 import { Camera } from '@mediapipe/camera_utils';
+import background from './assets/background.png';
+import unrcLogotype from './assets/unrc-logotype.png';
+import './App.css';
 
 function App() {
+  // States
+  const [currentTime, setCurrentTime] = useState('');
+
+  // References
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Secondary effects
   useEffect(() => {
     const holistic = new Holistic({
       locateFile: (file) =>
@@ -77,11 +84,53 @@ function App() {
     }
   }, []);
 
+  useEffect(() => {
+    const updateCurrentTime = () => {
+      const now = new Date();
+      const hours = now.getHours() % 12 || 12;
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
+      setCurrentTime(`${hours}:${minutes} ${ampm}`);
+    };
+
+    updateCurrentTime();
+    const intervalId = setInterval(updateCurrentTime, 60000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
   return (
-    <>
-      <video ref={videoRef} />
-      <canvas ref={canvasRef} width="640" height="480" className="output_canvas"></canvas>
-    </>
+    <div className='h-screen w-screen flex flex-col justify-center items-center gap-4 px-8 bg-cover bg-center' style={{ backgroundImage: `url("${background}")` }}>
+      <div className='w-full p-4 bg-gray-700/30 border border-gray-500 backdrop-blur-md rounded-lg'>
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-lg font-light text-gray-400">{currentTime}</span>
+            <span className="mx-2 text-lg text-gray-400">|</span>
+            <span className="text-lg font-medium text-white">✋ Digalo - Aplicación de Lenguaje de Señas Argentina</span>
+          </div>
+          <img src={unrcLogotype} alt="UNRC Logotype" className="h-14" />
+        </div>
+
+        <div className='flex justify-center items-center gap-4 mt-2'>
+          <div className="w-1/2 h-auto rounded-lg">
+            <video
+              ref={videoRef}
+              className='w-full h-auto rounded-lg'
+              style={{ objectFit: 'cover' }}
+            />
+          </div>
+          <div className="w-1/2 h-auto rounded-lg">
+            <canvas
+              ref={canvasRef}
+              width="640"
+              height="480"
+              className="w-full h-auto rounded-lg"
+              style={{ objectFit: "cover" }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
