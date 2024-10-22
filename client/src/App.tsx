@@ -1,23 +1,27 @@
 import { useRef, useEffect, useState } from 'react';
-import { Holistic } from '@mediapipe/holistic';
+import { Holistic, Results } from '@mediapipe/holistic';
 import { Camera } from '@mediapipe/camera_utils';
 import background from './assets/background.png';
 import unrcLogotype from './assets/unrc-logotype.png';
-import axios from 'axios';
 import './App.css';
 
 function App() {
   // States
-  const [currentTime, setCurrentTime] = useState('');
-  const [keypointsSequence, setKeypointsSequence] = useState([]); // Estado para almacenar la secuencia de keypoints
-  const [prediction, setPrediction] = useState(''); // Estado para la predicción del backend
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [keypointsSequence, setKeypointsSequence] = useState<number[][]>([]);
+  const [prediction, setPrediction] = useState<string>('');
 
   // References
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const sendSequenceToBackend = async (sequence) => {
-    console.log("Sending sequence to backend...", sequence);
+  const sendSequenceToBackend = async () => {
+    if (keypointsSequence.length < 30) {
+      console.log("Sequence is too short. Accumulated frames:", keypointsSequence.length);
+      return;
+    }
+
+    console.log("Sending sequence to backend...", keypointsSequence);
     try {
       const response = await fetch('/api/predict', {
         method: 'POST',
@@ -25,17 +29,125 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sequence: sequence,
+          sequence: keypointsSequence.slice(0, 30),
         }),
-      })
-        .then(response => response.json())
-        .then(data => console.log('Prediction:', data))
-        .catch(error => console.error('Error:', error));
+      });
+
+      const data = await response.json();
+      console.log('Prediction:', data);
+      setPrediction(data.prediction);
     } catch (error) {
       console.error('Error sending sequence:', error);
     }
   };
 
+  const normalizeKeypoints = (landmarks: { x: number, y: number }[]): number[] => {
+    const xCoords = landmarks.map(landmark => landmark.x);
+    const yCoords = landmarks.map(landmark => landmark.y);
+
+    const minX = Math.min(...xCoords);
+    const maxX = Math.max(...xCoords);
+    const minY = Math.min(...yCoords);
+    const maxY = Math.max(...yCoords);
+
+    const normalizedLandmarks = landmarks.map(landmark => {
+      const normalizedX = (landmark.x - minX) / (maxX - minX || 1);
+      const normalizedY = (landmark.y - minY) / (maxY - minY || 1);
+      return [normalizedX, normalizedY];
+    }).flat();
+
+    return normalizedLandmarks;
+  };
+
+  const onResults = (results: Results) => {
+    const keypoints: number[][] = [];
+
+    if (results.faceLandmarks) {
+      const normalizedFaceKeypoints = normalizeKeypoints(results.faceLandmarks.slice(0, 21));
+      keypoints.push(normalizedFaceKeypoints);
+    }
+
+    if (results.rightHandLandmarks) {
+      const normalizedRightHandKeypoints = normalizeKeypoints(results.rightHandLandmarks);
+      keypoints.push(normalizedRightHandKeypoints);
+    }
+
+    if (results.leftHandLandmarks) {
+      const normalizedLeftHandKeypoints = normalizeKeypoints(results.leftHandLandmarks);
+      keypoints.push(normalizedLeftHandKeypoints);
+    }
+
+    if (results.poseLandmarks) {
+      const normalizedPoseKeypoints = normalizeKeypoints(results.poseLandmarks);
+      keypoints.push(normalizedPoseKeypoints);
+    }
+
+    let flattenedKeypoints = keypoints.flat();
+
+    if (flattenedKeypoints.length < 84) {
+      const missingPoints = 84 - flattenedKeypoints.length;
+      flattenedKeypoints = [...flattenedKeypoints, ...Array(missingPoints).fill(0)];
+    }
+
+    if (flattenedKeypoints.length > 84) {
+      flattenedKeypoints = flattenedKeypoints.slice(0, 84);
+    }
+
+    if (flattenedKeypoints.length !== 84) {
+      console.error('Error: El frame no tiene 84 características.');
+      return;
+    }
+
+    setKeypointsSequence((prevSequence) => [...prevSequence, flattenedKeypoints]);
+
+    drawLandmarks(results);
+  };
+
+  const drawLandmarks = (results: Results) => {
+    if (!canvasRef.current || !videoRef.current) return;
+    const canvasCtx = canvasRef.current.getContext('2d');
+    canvasCtx?.save();
+    canvasCtx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+    // Draw the video
+    canvasCtx?.drawImage(
+      results.image as CanvasImageSource,
+      0,
+      0,
+      canvasRef.current.width,
+      canvasRef.current.height
+    );
+
+    // Draw face landmarks
+    if (results.faceLandmarks) {
+      results.faceLandmarks.forEach((landmark) => {
+        drawPoint(canvasCtx!, landmark, 'red', 1);
+      });
+    }
+
+    // Draw hand landmarks
+    if (results.rightHandLandmarks) {
+      results.rightHandLandmarks.forEach((landmark) => {
+        drawPoint(canvasCtx!, landmark, 'blue', 2);
+      });
+    }
+    if (results.leftHandLandmarks) {
+      results.leftHandLandmarks.forEach((landmark) => {
+        drawPoint(canvasCtx!, landmark, 'blue', 2);
+      });
+    }
+
+    canvasCtx?.restore();
+  };
+
+  const drawPoint = (ctx: CanvasRenderingContext2D, landmark: { x: number, y: number }, color: string, size: number) => {
+    const x = landmark.x * canvasRef.current!.width;
+    const y = landmark.y * canvasRef.current!.height;
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, 2 * Math.PI);
+    ctx.fillStyle = color;
+    ctx.fill();
+  };
 
   // Secondary effects
   useEffect(() => {
@@ -64,71 +176,6 @@ function App() {
       height: 480,
     });
     camera.start();
-
-    function onResults(results: any) {
-      if (!canvasRef.current || !videoRef.current) return;
-      const canvasCtx = canvasRef.current.getContext('2d');
-      canvasCtx?.save();
-      canvasCtx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-
-      // Draw the video
-      canvasCtx?.drawImage(
-        results.image,
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height
-      );
-
-      // Draw hand landmarks and collect keypoints
-      let keypoints = [];
-      let rightHandKeypoints = [];
-      let leftHandKeypoints = [];
-
-      if (results.rightHandLandmarks) {
-        // Flatten right hand landmarks (x, y coordinates)
-        rightHandKeypoints = results.rightHandLandmarks.map((point: any) => [point.x, point.y]).flat();
-      }
-
-      if (results.leftHandLandmarks) {
-        // Flatten left hand landmarks (x, y coordinates)
-        leftHandKeypoints = results.leftHandLandmarks.map((point: any) => [point.x, point.y]).flat();
-      }
-
-      // Rellenar con ceros si falta una mano
-      if (rightHandKeypoints.length === 0) {
-        rightHandKeypoints = Array(42).fill(0); // Rellenar con 42 ceros
-      }
-      if (leftHandKeypoints.length === 0) {
-        leftHandKeypoints = Array(42).fill(0); // Rellenar con 42 ceros
-      }
-
-      keypoints = rightHandKeypoints.concat(leftHandKeypoints);
-
-      // Agregar keypoints a la secuencia si hay datos (84 features per frame)
-      if (keypoints.length === 84) {
-        setKeypointsSequence((prevSequence: any) => {
-          const newSequence = [...prevSequence, keypoints].slice(-30); // Mantener longitud máxima de 30 frames
-          if (newSequence.length === 30) {
-            sendSequenceToBackend(newSequence.flat()); // Enviar la secuencia cuando esté completa
-          }
-          return newSequence;
-        });
-      }
-
-      canvasCtx?.restore();
-    }
-
-    function drawLandmarks(ctx: CanvasRenderingContext2D, landmarks: any, style: any) {
-      for (let i = 0; i < landmarks.length; i++) {
-        const x = landmarks[i].x * canvasRef.current!.width;
-        const y = landmarks[i].y * canvasRef.current!.height;
-        ctx.beginPath();
-        ctx.arc(x, y, style.lineWidth, 0, 2 * Math.PI);
-        ctx.fillStyle = style.color;
-        ctx.fill();
-      }
-    }
   }, []);
 
   useEffect(() => {
@@ -176,6 +223,14 @@ function App() {
             />
           </div>
         </div>
+
+        <button
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={sendSequenceToBackend}
+        >
+          Enviar Secuencia
+        </button>
+
         {prediction && (
           <div className="mt-4 text-white text-lg">
             Prediction: {prediction}
