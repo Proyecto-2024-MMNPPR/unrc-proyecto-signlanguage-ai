@@ -15,6 +15,13 @@ function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Function to play TTS based on the prediction
+  const speakPrediction = (text: string) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'es-AR'; // Lenguaje en español argentino
+    speechSynthesis.speak(utterance);
+  };
+
   const sendSequenceToBackend = async () => {
     if (keypointsSequence.length < 30) {
       console.log("Sequence is too short. Accumulated frames:", keypointsSequence.length);
@@ -192,6 +199,13 @@ function App() {
 
     return () => clearInterval(intervalId);
   }, []);
+
+  // Effect to trigger TTS when a new prediction is made
+  useEffect(() => {
+    if (prediction) {
+      speakPrediction(prediction);
+    }
+  }, [prediction]);
 
   return (
     <div className='h-screen w-screen flex flex-col justify-center items-center gap-4 px-8 bg-cover bg-center' style={{ backgroundImage: `url("${background}")` }}>
