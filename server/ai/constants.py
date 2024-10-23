@@ -16,7 +16,8 @@ START_KEY = 's'
 FINISH_KEY = 'f'
 EXIT_KEY = 'q'
 PAUSE_KEY = 'p'
-DYNAMIC_REPETITIONS = 5
+DYNAMIC_REPETITIONS = 20 # n_examples
+NUM_REPRESENTATIVE_FRAMES = 5
 
 # Data Set Creation
 DATA_DIR = f'{AI_PWD}/model/data'
