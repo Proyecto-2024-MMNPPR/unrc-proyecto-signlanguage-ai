@@ -5,14 +5,18 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'ai', 'model', 'model.p')
+LABELS_PATH = os.path.join(os.path.dirname(__file__), 'ai', 'model', 'label_dict.pickle')
 with open(MODEL_PATH, 'rb') as model_file:
     model_data = pickle.load(model_file)
+
+with open(LABELS_PATH, 'rb') as labels_file:
+    label_map = pickle.load(labels_file)
 
 app = Flask(__name__)
 CORS(app)
 
-MAX_SEQUENCE_LENGTH = 30
-NUM_FEATURES = 84
+MAX_SEQUENCE_LENGTH = 5
+NUM_FEATURES = 96
 
 @app.route('/api/predict', methods=['POST'])
 def predict():
@@ -38,15 +42,15 @@ def predict():
         return jsonify({'error': 'Invalid sequence length or features'}), 400
 
     try:
-        prediction = predict_sequence(model_data, sequence_np, MAX_SEQUENCE_LENGTH, NUM_FEATURES)
+        prediction = predict_sequence(model_data, label_map, sequence_np, MAX_SEQUENCE_LENGTH, NUM_FEATURES)
         return jsonify({'prediction': prediction}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-def predict_sequence(model_data, sequence, max_sequence_length, num_features):
-    model = model_data['model']
-    model_type = model_data['model_type']
-    label_map = model_data['label_map']
+def predict_sequence(model_data, labels_data, sequence, max_sequence_length, num_features):
+    model = model_data
+    model_type = 'Random Forest'
+    label_map = labels_data
 
     if model_type == 'LSTM' or model_type == 'LSTM + Attention':
         sequence = sequence.reshape(1, max_sequence_length, num_features)
