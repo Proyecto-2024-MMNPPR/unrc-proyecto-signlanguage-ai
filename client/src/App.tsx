@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Holistic, Results } from '@mediapipe/holistic';
+import { Holistic, Results, NormalizedLandmarkList } from '@mediapipe/holistic';
 import { Camera } from '@mediapipe/camera_utils';
 import background from './assets/background.png';
 import unrcLogotype from './assets/unrc-logotype.png';
@@ -10,6 +10,8 @@ function App() {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [keypointsSequence, setKeypointsSequence] = useState<number[][]>([]);
   const [prediction, setPrediction] = useState<string>('');
+
+  const numRepresentativeFrames = 5
 
   // References
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -23,12 +25,14 @@ function App() {
   };
 
   const sendSequenceToBackend = async () => {
-    if (keypointsSequence.length < 30) {
+    if (keypointsSequence.length < numRepresentativeFrames) {
       console.log("Sequence is too short. Accumulated frames:", keypointsSequence.length);
       return;
     }
+    const selectedFrames = linspace(0, keypointsSequence.length - 1, numRepresentativeFrames);
 
-    console.log("Sending sequence to backend...", keypointsSequence);
+    const finalSamples = selectedFrames.map(index => keypointsSequence[index])
+    console.log("Sending sequence to backend...", finalSamples);
     try {
       const response = await fetch('/api/predict', {
         method: 'POST',
@@ -36,13 +40,14 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sequence: keypointsSequence.slice(0, 30),
+          sequence: finalSamples,
         }),
       });
 
       const data = await response.json();
       console.log('Prediction:', data);
       setPrediction(data.prediction);
+      setKeypointsSequence([]);
     } catch (error) {
       console.error('Error sending sequence:', error);
     }
@@ -58,8 +63,13 @@ function App() {
     const maxY = Math.max(...yCoords);
 
     const normalizedLandmarks = landmarks.map(landmark => {
-      const normalizedX = (landmark.x - minX) / (maxX - minX || 1);
-      const normalizedY = (landmark.y - minY) / (maxY - minY || 1);
+      if (maxX - minX != 0) {
+        var normalizedX = (landmark.x - minX) / (maxX - minX);
+        var normalizedY = (landmark.y - minY) / (maxY - minY);
+      } else { 
+        var normalizedX = 0;
+        var normalizedY = 0;
+      }
       return [normalizedX, normalizedY];
     }).flat();
 
@@ -69,46 +79,61 @@ function App() {
   const onResults = (results: Results) => {
     const keypoints: number[][] = [];
 
-    if (results.faceLandmarks) {
-      const normalizedFaceKeypoints = normalizeKeypoints(results.faceLandmarks.slice(0, 21));
-      keypoints.push(normalizedFaceKeypoints);
+    if (results.leftHandLandmarks) {
+      const normalizedLeftHandKeypoints = results.leftHandLandmarks.map(landmark => [
+        landmark.x,
+        landmark.y,
+      ]).flat();
+      keypoints.push(normalizedLeftHandKeypoints);
+    } else {
+      keypoints.push(Array(42).fill(0).flat());
     }
 
     if (results.rightHandLandmarks) {
-      const normalizedRightHandKeypoints = normalizeKeypoints(results.rightHandLandmarks);
+      const normalizedRightHandKeypoints = results.rightHandLandmarks.map(landmark => [
+        landmark.x,
+        landmark.y,
+      ]).flat();
       keypoints.push(normalizedRightHandKeypoints);
+    } else {
+      const zeroKeypoints = Array(42).fill(0).flat();
+      keypoints.push(zeroKeypoints);
     }
 
-    if (results.leftHandLandmarks) {
-      const normalizedLeftHandKeypoints = normalizeKeypoints(results.leftHandLandmarks);
-      keypoints.push(normalizedLeftHandKeypoints);
-    }
-
-    if (results.poseLandmarks) {
-      const normalizedPoseKeypoints = normalizeKeypoints(results.poseLandmarks);
-      keypoints.push(normalizedPoseKeypoints);
+    if (results.faceLandmarks) {
+      var requiredLandmarks = [1, 33, 152, 234, 263, 454];
+      const filteredLandmarks: NormalizedLandmarkList = requiredLandmarks.map(index => results.faceLandmarks[index]);
+      results.faceLandmarks = filteredLandmarks;
+      const normalizedFaceKeypoints = filteredLandmarks.map(landmark => [
+        landmark.x,
+        landmark.y,
+      ]).flat();
+      keypoints.push(normalizedFaceKeypoints);
+    } else {
+      keypoints.push(Array(12).fill(0).flat());
     }
 
     let flattenedKeypoints = keypoints.flat();
+    let desiredKeypoints = 96
 
-    if (flattenedKeypoints.length < 84) {
-      const missingPoints = 84 - flattenedKeypoints.length;
-      flattenedKeypoints = [...flattenedKeypoints, ...Array(missingPoints).fill(0)];
-    }
 
-    if (flattenedKeypoints.length > 84) {
-      flattenedKeypoints = flattenedKeypoints.slice(0, 84);
-    }
-
-    if (flattenedKeypoints.length !== 84) {
-      console.error('Error: El frame no tiene 84 características.');
+    if (flattenedKeypoints.length !== desiredKeypoints) {
+      console.error('Error: El frame no tiene ' + desiredKeypoints + ' características.');
       return;
     }
-
     setKeypointsSequence((prevSequence) => [...prevSequence, flattenedKeypoints]);
 
     drawLandmarks(results);
   };
+
+  const linspace = (start: number, stop: number, num: number) => {
+      var arr = [];
+      var step = (stop - start) / (num - 1);
+      for (var i = 0; i < num; i++) {
+        arr.push(Math.round(start + (step * i)));
+      }
+      return arr;
+}
 
   const drawLandmarks = (results: Results) => {
     if (!canvasRef.current || !videoRef.current) return;
@@ -128,7 +153,7 @@ function App() {
     // Draw face landmarks
     if (results.faceLandmarks) {
       results.faceLandmarks.forEach((landmark) => {
-        drawPoint(canvasCtx!, landmark, 'red', 1);
+        drawPoint(canvasCtx!, landmark, 'red', 2);
       });
     }
 
@@ -168,7 +193,7 @@ function App() {
       smoothLandmarks: true,
       enableSegmentation: true,
       smoothSegmentation: true,
-      refineFaceLandmarks: true,
+      refineFaceLandmarks: false,
       minDetectionConfidence: 0.5,
       minTrackingConfidence: 0.5,
     });
