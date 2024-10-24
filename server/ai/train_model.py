@@ -106,10 +106,15 @@ def train_model() -> None:
         model_name = 'LSTM + Attention'
 
     # Save the best model
-    with open('model.p', 'wb') as f:
+    model_dir = os.path.join('server', 'ai', 'model')
+    os.makedirs(model_dir, exist_ok=True)
+
+    model_path = os.path.join(model_dir, 'model.p')
+    with open(model_path, 'wb') as f:
         pickle.dump({'model': best_model, 'model_type': model_name, 'label_map': int_to_label}, f)
 
-    print('The best model is {} with an accuracy of {:.2f}%'.format(model_name, max(score_rf, score_lstm, score_att_lstm) * 100))
+    print(f'The best model is {model_name} with an accuracy of {max(score_rf, score_lstm, score_att_lstm) * 100:.2f}%.')
+    print(f'Model saved to {model_path}.')
 
 
 if __name__ == '__main__':
