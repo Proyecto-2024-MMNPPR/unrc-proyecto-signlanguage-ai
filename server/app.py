@@ -1,6 +1,7 @@
 import os
 import pickle
 import numpy as np
+from openai import OpenAI
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -15,6 +16,7 @@ with open(LABELS_PATH, 'rb') as labels_file:
 app = Flask(__name__)
 CORS(app)
 
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 MAX_SEQUENCE_LENGTH = 5
 NUM_FEATURES = 96
 
@@ -44,6 +46,24 @@ def predict():
     try:
         prediction = predict_sequence(model_data, label_map, sequence_np, MAX_SEQUENCE_LENGTH, NUM_FEATURES)
         return jsonify({'prediction': prediction}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/openai', methods=['POST'])
+def interpret_with_openai_api():
+    data = request.json
+    prediction = data.get('prediction')
+
+    if not prediction:
+        return jsonify({'error': 'No prediction provided'}), 400
+
+    try:
+        print(f"Prediction: {prediction}")
+        ai_response = interpret_with_openai(prediction)
+        return jsonify({'ai_response': ai_response}), 200
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -61,6 +81,22 @@ def predict_sequence(model_data, labels_data, sequence, max_sequence_length, num
         prediction = model.predict(sequence)
 
     return label_map[int(prediction[0])]
+
+
+def interpret_with_openai(prediction):
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": f"Corrige la gramática de esta secuencia de lenguaje de señas argentinas sin explicaciones, solo dame la frase mejorada (si es sólo una letra o una sóla palabra, retornar esa sóla letra o sólo palabra): {prediction}"}
+            ]
+        )
+
+        result = completion.choices[0].message.content
+        return result
+    except Exception as e:
+        raise Exception(f"Error while communicating with OpenAI: {str(e)}")
 
 if __name__ == '__main__':
     app.run(debug=True)

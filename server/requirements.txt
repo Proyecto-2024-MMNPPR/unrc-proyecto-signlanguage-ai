@@ -13,3 +13,4 @@ timm
 PyQt5
 Flask
 Flask-Cors
+openai

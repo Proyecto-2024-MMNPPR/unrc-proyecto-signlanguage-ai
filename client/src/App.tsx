@@ -10,6 +10,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [keypointsSequence, setKeypointsSequence] = useState<number[][]>([]);
   const [prediction, setPrediction] = useState<string>('');
+  const [openAiResponse, setOpenAiResponse] = useState<string>('');
 
   const numRepresentativeFrames = 5
 
@@ -20,7 +21,7 @@ function App() {
   // Function to play TTS based on the prediction
   const speakPrediction = (text: string) => {
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-AR'; // Lenguaje en español argentino
+    utterance.lang = 'es-AR';
     speechSynthesis.speak(utterance);
   };
 
@@ -31,7 +32,7 @@ function App() {
     }
     const selectedFrames = linspace(0, keypointsSequence.length - 1, numRepresentativeFrames);
 
-    const finalSamples = selectedFrames.map(index => keypointsSequence[index])
+    const finalSamples = selectedFrames.map(index => keypointsSequence[index]);
     console.log("Sending sequence to backend...", finalSamples);
     try {
       const response = await fetch('/api/predict', {
@@ -48,32 +49,25 @@ function App() {
       console.log('Prediction:', data);
       setPrediction(data.prediction);
       setKeypointsSequence([]);
+
+      const openAiResponse = await fetch('/api/openai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prediction: data.prediction,
+        }),
+      });
+
+      const openAiData = await openAiResponse.json();
+      console.log('OpenAI Response:', openAiData);
+      setOpenAiResponse(openAiData.ai_response);
+
+      speakPrediction(openAiData.ai_response);
     } catch (error) {
       console.error('Error sending sequence:', error);
     }
-  };
-
-  const normalizeKeypoints = (landmarks: { x: number, y: number }[]): number[] => {
-    const xCoords = landmarks.map(landmark => landmark.x);
-    const yCoords = landmarks.map(landmark => landmark.y);
-
-    const minX = Math.min(...xCoords);
-    const maxX = Math.max(...xCoords);
-    const minY = Math.min(...yCoords);
-    const maxY = Math.max(...yCoords);
-
-    const normalizedLandmarks = landmarks.map(landmark => {
-      if (maxX - minX != 0) {
-        var normalizedX = (landmark.x - minX) / (maxX - minX);
-        var normalizedY = (landmark.y - minY) / (maxY - minY);
-      } else { 
-        var normalizedX = 0;
-        var normalizedY = 0;
-      }
-      return [normalizedX, normalizedY];
-    }).flat();
-
-    return normalizedLandmarks;
   };
 
   const onResults = (results: Results) => {
@@ -127,13 +121,13 @@ function App() {
   };
 
   const linspace = (start: number, stop: number, num: number) => {
-      var arr = [];
-      var step = (stop - start) / (num - 1);
-      for (var i = 0; i < num; i++) {
-        arr.push(Math.round(start + (step * i)));
-      }
-      return arr;
-}
+    var arr = [];
+    var step = (stop - start) / (num - 1);
+    for (var i = 0; i < num; i++) {
+      arr.push(Math.round(start + (step * i)));
+    }
+    return arr;
+  }
 
   const drawLandmarks = (results: Results) => {
     if (!canvasRef.current || !videoRef.current) return;
@@ -272,7 +266,7 @@ function App() {
 
         {prediction && (
           <div className="mt-4 text-white text-lg">
-            Prediction: {prediction}
+            Prediction: {openAiResponse}
           </div>
         )}
       </div>
