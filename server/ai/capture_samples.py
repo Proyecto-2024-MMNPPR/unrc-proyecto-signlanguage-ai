@@ -2,6 +2,7 @@ import os
 import time
 import cv2
 import numpy as np
+from scipy.ndimage import gaussian_filter
 from mediapipe.python.solutions.holistic import Holistic
 from helpers import *
 from constants import *
@@ -18,7 +19,7 @@ def get_input_word() -> str:
     return word_to_train
 
 
-def capture_samples(word: str, sequence_length: int = 30) -> None:
+def capture_samples(word: str, sequence_length: int = 5) -> None:
     """
     Captures samples for the given word using webcam video.
     `word`: The word to be captured.
@@ -31,16 +32,15 @@ def capture_samples(word: str, sequence_length: int = 30) -> None:
 
         capturing_msg = f'Capturing: "{word}"'
         repetitions = DYNAMIC_REPETITIONS
-        num_frames = sequence_length
 
         start_window(capturing_msg)
 
         for rep in range(repetitions):
             cam = start_camera()
-
             frames = []
             capturing = False
             paused = False
+            prev_frame = None
 
             print(f"Starting capture {rep + 1}/{repetitions} for “{word}”")
 
@@ -68,6 +68,7 @@ def capture_samples(word: str, sequence_length: int = 30) -> None:
                 if key == ord(START_KEY) and not capturing and not paused:
                     capturing = True
                     frames = []  # Reset frames
+                    prev_frame = None
                     print('Capture started...')
 
                 # Pause capturing
@@ -79,7 +80,7 @@ def capture_samples(word: str, sequence_length: int = 30) -> None:
                         print('Capture resumed...')
 
                 # Stop capturing
-                elif capturing and key == ord(FINISH_KEY) or len(frames) >= num_frames:
+                elif capturing and key == ord(FINISH_KEY):
                     capturing = False
                     print(f'Capture {rep + 1}/{repetitions} for “{word}” finished.')
                     save_samples(word_dir, frames, rep)
@@ -89,7 +90,18 @@ def capture_samples(word: str, sequence_length: int = 30) -> None:
 
                 # Collect frames regardless of whether a hand is detected
                 if capturing and not paused:
-                    frames.append(frame)
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    gray = gaussian_filter(gray, sigma=1.5)
+
+                    if prev_frame is not None:
+                        diff = cv2.absdiff(prev_frame, gray)
+                        thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)[1]
+                        keypoints = np.argwhere(thresh > 0)
+
+                        if keypoints.size > 0:
+                            frames.append(frame)
+
+                    prev_frame = gray
 
                 # Exit on 'q' key or if the window is closed
                 if cv2.getWindowProperty(capturing_msg, cv2.WND_PROP_VISIBLE) < 1 or key == ord(EXIT_KEY):
@@ -106,19 +118,17 @@ def capture_samples(word: str, sequence_length: int = 30) -> None:
 
 def save_samples(word_dir: str, frames, rep: int) -> None:
     """
-    Saves captured frames as images in a sequence.
+    Saves 5 significant frames from the capture sequence.
     """
 
-    sequence_folder = os.path.join(word_dir, f'sequence_{rep + 1}')
-    create_folder(sequence_folder)
-    for idx, frame in enumerate(frames):
-        frame_path = os.path.join(sequence_folder, f'frame_{idx}.jpg')
-        cv2.imwrite(frame_path, frame)
+    example_folder = os.path.join(word_dir, f'example_{rep + 1}')
+    create_folder(example_folder)
+    num_frames = NUM_REPRESENTATIVE_FRAMES
+    selected_frames = np.linspace(0, len(frames) - 1, num_frames, dtype=int)
 
-        # Save mirrored frame
-        mirrored_frame = cv2.flip(frame, 1)
-        mirrored_path = os.path.join(sequence_folder, f'frame_{idx}_mirror.jpg')
-        cv2.imwrite(mirrored_path, mirrored_frame)
+    for idx, frame_idx in enumerate(selected_frames):
+        frame_path = os.path.join(example_folder, f'sequence_{idx + 1}.jpg')
+        cv2.imwrite(frame_path, frames[frame_idx])
 
 
 def want_to_capture_another_word() -> bool:
